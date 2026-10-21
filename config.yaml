@@ -1,0 +1,68 @@
+# jobhunter run configuration — see architecture.html for the reasoning behind each default.
+
+paths:
+  inbox_dir: "data/inbox"
+  profile_path: "data/profile/profile.json"
+  db_path: "data/state.db"
+  google_credentials: "data/google_credentials.json" # OAuth client secret, from Google Cloud Console
+  google_token: "data/google_token.json"              # created automatically on first auth
+
+search:
+  target_domains:
+    - "Life Science & Quality Control"
+    - "Coding & Data Science"
+  queries:
+    - "Quality Control"
+    - "Qualitätsmanager/in"
+    - "Qualitätskontrolle"
+    - "Product Manager/in"
+    - "Data Science"
+    - "Data Scientist"
+    - "Data Scientist Quereinsteiger/in"
+    - "Data Science Quereinsteiger/in"
+    - "Life Science-Profi"
+    - "Life Science Verbindungsexperte/in"
+    - "System-Ingenieur/in"
+    - "Biochemie"
+    - "Proteinbiochemie"
+    - "Protein Biochemie"
+    - "Wissenschaft, Labor"
+    - "Research Associate"
+    - "Team Lead Research and Development"
+    - "Research and Development Engineer"
+    - "Research and Development"
+  locations:
+    - "Germany"
+  sources: ["stepstone", "jobvector", "indeed", "linkedin"] # run order = risk order, see architecture.html
+
+  # Clusters near-duplicate/related queries under one label in run/dry-run
+  # output. Presentational only — every query above still gets searched
+  # individually; results within a group are deduped by URL when reported.
+  query_groups:
+    "Quality Control": ["Quality Control", "Qualitätsmanager/in", "Qualitätskontrolle", "Product Manager/in"]
+    "Data Science": ["Data Scientist", "Data Science", "System-Ingenieur/in", "Data Scientist Quereinsteiger/in", "Data Science Quereinsteiger/in"]
+    "Life Science": ["Life Science-Profi", "Life Science Verbindungsexperte/in"]
+    "Biochemistry & Research": ["Biochemie", "Proteinbiochemie", "Protein Biochemie", "Wissenschaft, Labor", "Research Associate"]
+    "R&D": ["Team Lead Research and Development", "Research and Development Engineer", "Research and Development"]
+
+  # Max postings collected per (query, location) search, per source. null = no
+  # cap — each adapter scrolls/paginates until the listing is exhausted.
+  max_postings_per_search: null
+
+matching:
+  score_threshold: 50
+
+scheduler:
+  # cron-style hours (24h, local time) the loop fires at
+  run_hours: [20, 23]
+
+email:
+  notify_to: "gkgoshazz@gmail.com" # defaults to the authenticated Gmail account's own address if blank
+  digest_subject: "Job matches — {count} new"
+  triage_enabled: false # skips inbox-reading (needs Gmail OAuth); flip to true once data/google_token.json exists
+
+llm:
+  host: "http://localhost:11434" # Ollama server; override via OLLAMA_HOST env var
+  model: "qwen2.5:1.5b"          # local, free, no API key — `ollama pull qwen2.5:1.5b`
+  extraction_temperature: 0.2
+  matching_temperature: 0.2

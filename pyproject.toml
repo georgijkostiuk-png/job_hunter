@@ -1,0 +1,42 @@
+[project]
+name = "jobhunter"
+version = "0.1.0"
+description = "Autonomous job-search pipeline: documents -> profile -> scraped postings -> matches -> email"
+requires-python = ">=3.11"
+dependencies = [
+  "pydantic>=2.7",
+  "pyyaml>=6.0",
+  "python-dotenv>=1.0",
+  "requests>=2.32",
+  "playwright>=1.47",
+  "playwright-stealth>=2.0",
+  "google-api-python-client>=2.140",
+  "google-auth-httplib2>=0.2",
+  "google-auth-oauthlib>=1.2",
+  "apscheduler>=3.10",
+  # pypdf/pypdfium2, not pymupdf: pymupdf's compiled _mupdf DLL gets blocked
+  # by Windows Smart App Control / Application Control policies on some
+  # machines (unsigned/unrecognized binary); these two load cleanly.
+  "pypdf>=5.0",
+  "pypdfium2>=4.30",
+  "python-docx>=1.1",
+  "pytesseract>=0.3.10",
+  "pillow>=10.4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-mock>=3.14"]
+
+[project.scripts]
+jobhunter = "jobhunter.cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

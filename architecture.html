@@ -1,0 +1,631 @@
+<title>Autonomous Job-Search Pipeline — System Architecture</title>
+
+<style>
+  :root{
+    --bg: #f6f5f1;
+    --surface: #ffffff;
+    --surface-2: #efece3;
+    --ink: #211f1a;
+    --ink-soft: #5c584e;
+    --ink-faint: #8a8577;
+    --line: #dcd8cc;
+    --line-strong: #c6c1b1;
+    --accent: #a85f26;
+    --accent-ink: #ffffff;
+    --accent-2: #2b6e67;
+    --good: #3f7d4a;
+    --warn: #9c6a10;
+    --bad: #a13b32;
+    --code-bg: #efece2;
+    --shadow: 0 1px 2px rgba(33,31,26,0.06), 0 8px 24px -12px rgba(33,31,26,0.12);
+    --radius: 3px;
+  }
+
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg: #17160f;
+      --surface: #201e17;
+      --surface-2: #262319;
+      --ink: #ece8db;
+      --ink-soft: #b3ad9b;
+      --ink-faint: #7d7869;
+      --line: #38341f;
+      --line-strong: #4a442b;
+      --accent: #dd9a58;
+      --accent-ink: #1a1002;
+      --accent-2: #6fbdb4;
+      --good: #6fbf7a;
+      --warn: #dcab4c;
+      --bad: #e28578;
+      --code-bg: #1c1a12;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg: #17160f;
+    --surface: #201e17;
+    --surface-2: #262319;
+    --ink: #ece8db;
+    --ink-soft: #b3ad9b;
+    --ink-faint: #7d7869;
+    --line: #38341f;
+    --line-strong: #4a442b;
+    --accent: #dd9a58;
+    --accent-ink: #1a1002;
+    --accent-2: #6fbdb4;
+    --good: #6fbf7a;
+    --warn: #dcab4c;
+    --bad: #e28578;
+    --code-bg: #1c1a12;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+
+  *{ box-sizing: border-box; }
+  ::selection{ background: var(--accent); color: var(--accent-ink); }
+
+  body{
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Charter, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page{
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 56px 28px 96px;
+  }
+
+  h1,h2,h3{
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    font-weight: 600;
+    text-wrap: balance;
+    color: var(--ink);
+  }
+
+  .eyebrow{
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  header.cover{
+    border-bottom: 1px solid var(--line-strong);
+    padding-bottom: 28px;
+    margin-bottom: 44px;
+  }
+  header.cover h1{
+    font-size: 34px;
+    line-height: 1.15;
+    margin: 10px 0 12px;
+  }
+  header.cover p.lede{
+    font-size: 17.5px;
+    color: var(--ink-soft);
+    max-width: 62ch;
+    margin: 0 0 22px;
+  }
+  .meta-row{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 28px;
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  .meta-row span b{
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  section{ margin: 48px 0; }
+  h2{
+    font-size: 22px;
+    margin: 0 0 6px;
+  }
+  h2 + p.section-sub{
+    margin: 0 0 22px;
+    color: var(--ink-soft);
+    font-size: 15px;
+    max-width: 68ch;
+  }
+
+  figure{ margin: 0; }
+  figure.diagram{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 12px;
+    box-shadow: var(--shadow);
+    overflow-x: auto;
+  }
+  figure.diagram svg{ display:block; width: 100%; height: auto; min-width: 640px; }
+  figcaption{
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 13px;
+    color: var(--ink-faint);
+    margin-top: 10px;
+    padding: 0 4px;
+  }
+
+  .svg-node-label{ font: 600 13px/1.2 -apple-system, "Segoe UI", system-ui, sans-serif; }
+  .svg-node-sub{ font: 400 10.5px/1.2 -apple-system, "Segoe UI", system-ui, sans-serif; }
+  .svg-arrow-label{ font: 600 10.5px/1 -apple-system, "Segoe UI", system-ui, sans-serif; letter-spacing: 0.01em; }
+
+  .modules{
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 640px){ .modules{ grid-template-columns: 1fr; } }
+
+  .card{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .card .idx{
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--accent-2);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: block;
+  }
+  .card h3{
+    font-size: 17px;
+    margin: 0 0 6px;
+  }
+  .card p{
+    font-size: 14.5px;
+    color: var(--ink-soft);
+    margin: 0 0 10px;
+  }
+  .card .flow{
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+    border-top: 1px solid var(--line);
+    padding-top: 8px;
+    margin-top: 2px;
+  }
+  .card .flow b{ color: var(--accent-2); font-weight: 600; }
+
+  pre{
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+  .schemas{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 800px){ .schemas{ grid-template-columns: 1fr; } }
+  .schemas h4{
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--ink-soft);
+    margin: 0 0 8px;
+  }
+
+  .callout{
+    border: 1px solid var(--line-strong);
+    border-left: 3px solid var(--warn);
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 18px 22px;
+  }
+  .callout .eyebrow{ color: var(--warn); }
+  .callout h3{ font-size: 16.5px; margin: 8px 0 10px; }
+  .callout p{ font-size: 14.5px; color: var(--ink-soft); margin: 0 0 10px; }
+  .callout ul{ margin: 0; padding-left: 20px; font-size: 14.5px; color: var(--ink-soft); }
+  .callout li{ margin: 4px 0; }
+  .callout a{ color: var(--accent-2); }
+
+  table{
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  th, td{
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  thead th{
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    border-bottom: 1px solid var(--line-strong);
+  }
+  td code, li code{
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 12.5px;
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+  .table-wrap{ overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+  .table-wrap table{ min-width: 560px; }
+
+  ol.steps{
+    padding-left: 22px;
+    font-size: 15px;
+  }
+  ol.steps li{ margin: 8px 0; color: var(--ink); }
+  ol.steps li span{ color: var(--ink-soft); }
+
+  footer{
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 13px;
+    color: var(--ink-faint);
+  }
+
+  a{ color: var(--accent-2); }
+  a:focus-visible, button:focus-visible{ outline: 2px solid var(--accent-2); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce){ *{ animation: none !important; transition: none !important; } }
+</style>
+
+<div class="page">
+
+  <header class="cover">
+    <span class="eyebrow">System Architecture · Built</span>
+    <h1>Autonomous Job-Search Pipeline</h1>
+    <p class="lede">A locally-powered pipeline that reads your documents into a structured profile, scouts job boards with Playwright, scores every new posting against that profile, and keeps you and your inbox in sync — without you touching a spreadsheet, or paying for an API key.</p>
+    <div class="meta-row">
+      <span><b>LLM</b> Ollama (qwen2.5:1.5b, local, free)</span>
+      <span><b>Email</b> Gmail API (OAuth)</span>
+      <span><b>Scraping</b> Playwright, adapter-per-site</span>
+      <span><b>Language</b> Python 3.11+</span>
+      <span><b>Status</b> code running, 25/25 tests passing — awaiting your documents &amp; credentials</span>
+    </div>
+  </header>
+
+  <section id="diagram">
+    <h2>How data moves through the system</h2>
+    <p class="section-sub">One setup pass turns your paperwork into <code>profile.json</code>. Everything after that runs on a loop: scrape → score against the profile → dedupe against history → notify → watch the inbox for replies.</p>
+
+    <figure class="diagram">
+      <svg viewBox="0 0 1120 630" role="img" aria-label="Diagram: Documents flow through Ingestion and a local Ollama Extraction step into profile.json. Separately, Job Sites flow through the Playwright Scraper and a local Ollama Matcher that reads profile.json, into a Tracker database, then a Notifier that sends email via Gmail. Gmail inbox also feeds a local Ollama Email Agent that updates the Tracker. A scheduler loop arrow runs from the Tracker back to the Scraper, repeating on an interval.">
+
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+          <marker id="arrowAccent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#a85f26"/>
+          </marker>
+        </defs>
+
+        <g stroke="currentColor" fill="none" opacity="0.9">
+          <!-- row 1: setup pass -->
+          <line x1="170" y1="80" x2="222" y2="80" marker-end="url(#arrow)"/>
+          <line x1="352" y1="80" x2="404" y2="80" marker-end="url(#arrow)"/>
+          <line x1="490" y1="110" x2="490" y2="152" marker-end="url(#arrow)"/>
+
+          <!-- vertical: profile.json down to Matcher -->
+          <line x1="490" y1="200" x2="490" y2="330" marker-end="url(#arrow)"/>
+
+          <!-- row 2: main loop -->
+          <line x1="170" y1="360" x2="222" y2="360" marker-end="url(#arrow)"/>
+          <line x1="352" y1="360" x2="404" y2="360" marker-end="url(#arrow)"/>
+          <line x1="576" y1="360" x2="628" y2="360" marker-end="url(#arrow)"/>
+          <line x1="748" y1="360" x2="800" y2="360" marker-end="url(#arrow)"/>
+
+          <!-- Notifier to Gmail -->
+          <line x1="900" y1="340" x2="978" y2="300" marker-end="url(#arrow)"/>
+          <!-- Gmail to You -->
+          <line x1="1030" y1="255" x2="1030" y2="217" marker-end="url(#arrow)"/>
+
+          <!-- Gmail inbox down to Email Agent -->
+          <line x1="990" y1="305" x2="932" y2="480" marker-end="url(#arrow)"/>
+          <!-- Email agent back up to Tracker -->
+          <line x1="800" y1="480" x2="702" y2="388" marker-end="url(#arrow)"/>
+        </g>
+
+        <!-- scheduler loop arrow (accent) -->
+        <path d="M 700 400 C 700 560, 250 560, 250 392" stroke="#a85f26" stroke-width="2" fill="none" marker-end="url(#arrowAccent)"/>
+        <text x="475" y="580" text-anchor="middle" fill="#a85f26" class="svg-arrow-label">SCHEDULER · re-runs the loop every N hours</text>
+
+        <!-- ===== ROW 1 nodes ===== -->
+        <g>
+          <rect x="30" y="55" width="140" height="50" rx="3" fill="none" stroke="currentColor"/>
+          <text x="100" y="76" text-anchor="middle" class="svg-node-label">Documents</text>
+          <text x="100" y="92" text-anchor="middle" class="svg-node-sub" opacity="0.65">diplomas · CV · refs</text>
+        </g>
+        <g>
+          <rect x="222" y="55" width="130" height="50" rx="3" fill="none" stroke="currentColor"/>
+          <text x="287" y="76" text-anchor="middle" class="svg-node-label">Ingestion</text>
+          <text x="287" y="92" text-anchor="middle" class="svg-node-sub" opacity="0.65">OCR + text extract</text>
+        </g>
+        <g>
+          <rect x="404" y="55" width="172" height="50" rx="3" fill="none" stroke="#a85f26" stroke-width="1.5"/>
+          <text x="490" y="76" text-anchor="middle" class="svg-node-label">Extraction · Ollama</text>
+          <text x="490" y="92" text-anchor="middle" class="svg-node-sub" opacity="0.65">unstructured → schema</text>
+        </g>
+
+        <!-- profile.json store (cylinder-ish) -->
+        <g>
+          <rect x="420" y="152" width="140" height="48" rx="3" fill="none" stroke="currentColor" stroke-dasharray="4 3"/>
+          <text x="490" y="172" text-anchor="middle" class="svg-node-label">profile.json</text>
+          <text x="490" y="188" text-anchor="middle" class="svg-node-sub" opacity="0.65">versioned, editable</text>
+        </g>
+
+        <!-- ===== ROW 2 nodes ===== -->
+        <g>
+          <rect x="30" y="335" width="140" height="50" rx="3" fill="none" stroke="currentColor"/>
+          <text x="100" y="356" text-anchor="middle" class="svg-node-label">Job Sites</text>
+          <text x="100" y="372" text-anchor="middle" class="svg-node-sub" opacity="0.65">boards + APIs</text>
+        </g>
+        <g>
+          <rect x="222" y="335" width="130" height="50" rx="3" fill="none" stroke="currentColor"/>
+          <text x="287" y="356" text-anchor="middle" class="svg-node-label">Scraper</text>
+          <text x="287" y="372" text-anchor="middle" class="svg-node-sub" opacity="0.65">Playwright, per-site</text>
+        </g>
+        <g>
+          <rect x="404" y="335" width="172" height="50" rx="3" fill="none" stroke="#a85f26" stroke-width="1.5"/>
+          <text x="490" y="356" text-anchor="middle" class="svg-node-label">Matcher · Ollama</text>
+          <text x="490" y="372" text-anchor="middle" class="svg-node-sub" opacity="0.65">profile × posting → score</text>
+        </g>
+        <g>
+          <rect x="628" y="335" width="120" height="50" rx="3" fill="none" stroke="currentColor" stroke-dasharray="4 3"/>
+          <text x="688" y="356" text-anchor="middle" class="svg-node-label">Tracker DB</text>
+          <text x="688" y="372" text-anchor="middle" class="svg-node-sub" opacity="0.65">dedupe · state</text>
+        </g>
+        <g>
+          <rect x="800" y="335" width="100" height="50" rx="3" fill="none" stroke="currentColor"/>
+          <text x="850" y="356" text-anchor="middle" class="svg-node-label">Notifier</text>
+          <text x="850" y="372" text-anchor="middle" class="svg-node-sub" opacity="0.65">digest builder</text>
+        </g>
+
+        <!-- Gmail + You, top right -->
+        <g>
+          <rect x="970" y="255" width="120" height="50" rx="3" fill="none" stroke="currentColor"/>
+          <text x="1030" y="276" text-anchor="middle" class="svg-node-label">Gmail</text>
+          <text x="1030" y="292" text-anchor="middle" class="svg-node-sub" opacity="0.65">send + inbox</text>
+        </g>
+        <g>
+          <rect x="985" y="175" width="90" height="42" rx="3" fill="none" stroke="currentColor"/>
+          <text x="1030" y="201" text-anchor="middle" class="svg-node-label">You</text>
+        </g>
+
+        <!-- Email agent, row 3 -->
+        <g>
+          <rect x="780" y="480" width="190" height="50" rx="3" fill="none" stroke="#a85f26" stroke-width="1.5"/>
+          <text x="875" y="501" text-anchor="middle" class="svg-node-label">Email Agent · Ollama</text>
+          <text x="875" y="517" text-anchor="middle" class="svg-node-sub" opacity="0.65">triage replies</text>
+        </g>
+
+        <!-- arrow labels -->
+        <text x="196" y="72" text-anchor="middle" class="svg-arrow-label" opacity="0.75">reads</text>
+        <text x="378" y="72" text-anchor="middle" class="svg-arrow-label" opacity="0.75">extracts</text>
+        <text x="510" y="132" text-anchor="middle" class="svg-arrow-label" opacity="0.75">writes</text>
+        <text x="510" y="270" text-anchor="middle" class="svg-arrow-label" opacity="0.75">reads</text>
+        <text x="196" y="352" text-anchor="middle" class="svg-arrow-label" opacity="0.75">crawls</text>
+        <text x="378" y="352" text-anchor="middle" class="svg-arrow-label" opacity="0.75">normalizes</text>
+        <text x="602" y="352" text-anchor="middle" class="svg-arrow-label" opacity="0.75">scores</text>
+        <text x="774" y="352" text-anchor="middle" class="svg-arrow-label" opacity="0.75">new matches</text>
+        <text x="939" y="323" text-anchor="middle" class="svg-arrow-label" opacity="0.75">sends</text>
+        <text x="1044" y="240" text-anchor="start" class="svg-arrow-label" opacity="0.75">reads</text>
+        <text x="958" y="400" text-anchor="middle" class="svg-arrow-label" opacity="0.75">inbox poll</text>
+        <text x="752" y="440" text-anchor="middle" class="svg-arrow-label" opacity="0.75">status update</text>
+      </svg>
+    </figure>
+    <figcaption>The local LLM calls (amber outline), all served by the same Ollama process, sit at the boundary between messy human text — documents, emails — and the structured data the rest of the system runs on. Everything downstream of <code>profile.json</code> re-runs on the scheduler loop; the extraction step does not.</figcaption>
+  </section>
+
+  <section id="modules">
+    <h2>Modules</h2>
+    <p class="section-sub">Seven small, independently testable pieces. Each one has a single job and a typed input/output — swapping a job site or an email provider later means replacing one module, not the pipeline.</p>
+    <div class="modules">
+
+      <div class="card">
+        <span class="idx">01 · Setup pass</span>
+        <h3>Ingestion</h3>
+        <p>Watches a local <code>/inbox</code> folder for anything you drop in — PDFs, DOCX, scanned images of diplomas or reference letters. Runs OCR on images/scanned PDFs, extracts raw text from native PDFs and DOCX.</p>
+        <div class="flow"><b>in</b> files → <b>out</b> raw text + source metadata</div>
+      </div>
+
+      <div class="card">
+        <span class="idx">02 · Setup pass</span>
+        <h3>Extraction Engine</h3>
+        <p>Sends raw text to a local Ollama model (default <code>qwen2.5:1.5b</code>) with output grammar-constrained to a JSON schema that <em>is</em> the candidate profile — education, certifications, work history, skills, languages — with a validate-and-retry loop for a small model's occasional misses. You review and correct the draft once before it's trusted for matching.</p>
+        <div class="flow"><b>in</b> raw text → <b>out</b> <code>profile.json</code></div>
+      </div>
+
+      <div class="card">
+        <span class="idx">03 · Loop</span>
+        <h3>Scraper</h3>
+        <p>One adapter class per source, same interface: <code>fetch(query, location) → JobPosting[]</code>. Targets: StepStone, Indeed, jobvector, LinkedIn — filtered to Life Science/QC and coding/data-science roles. All four are scrape-only in 2026; see the compliance note below before running against them.</p>
+        <div class="flow"><b>in</b> search config → <b>out</b> raw postings</div>
+      </div>
+
+      <div class="card">
+        <span class="idx">04 · Loop</span>
+        <h3>Matcher</h3>
+        <p>The local Ollama model compares each new posting against <code>profile.json</code> and returns a score, the reasons for it, and what's missing — not just a yes/no. Threshold is configurable, so you tune sensitivity instead of me guessing it.</p>
+        <div class="flow"><b>in</b> profile + posting → <b>out</b> <code>match_result.json</code></div>
+      </div>
+
+      <div class="card">
+        <span class="idx">05 · Loop</span>
+        <h3>Tracker</h3>
+        <p>A small SQLite database that remembers what you've already seen. This is what stops the same posting from emailing you twice, and what turns raw matches into a lifecycle: discovered → notified → applied → responded → closed.</p>
+        <div class="flow"><b>in</b> matches + thread updates → <b>out</b> current state</div>
+      </div>
+
+      <div class="card">
+        <span class="idx">06 · Loop</span>
+        <h3>Email Agent</h3>
+        <p>Two-way with Gmail. Outbound: sends you a plain-language digest of new high-scoring matches. Inbound: polls the inbox for recruiter replies or interview requests tied to tracked applications and asks the local model to summarize and file the status update.</p>
+        <div class="flow"><b>in</b>/<b>out</b> Gmail (OAuth, scoped)</div>
+      </div>
+
+      <div class="card">
+        <span class="idx">07 · Loop</span>
+        <h3>Scheduler</h3>
+        <p>Runs the loop — scrape, match, notify, poll inbox, update tracker — on an interval you set (e.g. every 4 hours), then sleeps. Owns the run config: search queries, locations, score threshold, cadence.</p>
+        <div class="flow"><b>owns</b> config.yaml + run cadence</div>
+      </div>
+
+    </div>
+  </section>
+
+  <section id="schemas">
+    <h2>Data contracts</h2>
+    <p class="section-sub">The three shapes everything else is built around. Pydantic models mirror these exactly, so a schema change is a one-file edit, not a hunt through the codebase.</p>
+    <div class="schemas">
+      <div>
+        <h4>profile.json</h4>
+<pre>{
+  "contact": {...},
+  "education": [{
+    "institution": "",
+    "degree": "",
+    "field": "",
+    "graduated": "YYYY-MM"
+  }],
+  "certifications": [{
+    "name": "", "issuer": "",
+    "issued": "YYYY-MM"
+  }],
+  "experience": [{
+    "employer": "", "title": "",
+    "start": "", "end": "",
+    "highlights": []
+  }],
+  "skills": [],
+  "languages": [],
+  "version": 3,
+  "updated_at": ""
+}</pre>
+      </div>
+      <div>
+        <h4>job_posting.json</h4>
+<pre>{
+  "id": "sha256(company+
+    title+location,
+    normalized)",
+  "source": "adzuna|linkedin|...",
+  "title": "",
+  "company": "",
+  "location": "",
+  "url": "",
+  "description": "",
+  "posted_at": "",
+  "scraped_at": ""
+}</pre>
+      </div>
+      <div>
+        <h4>match_result.json</h4>
+<pre>{
+  "job_id": "",
+  "score": 0,
+  "reasons": [],
+  "missing_requirements": [],
+  "recommendation":
+    "notify|skip|watch",
+  "scored_at": ""
+}</pre>
+      </div>
+    </div>
+  </section>
+
+  <section id="compliance">
+    <div class="callout">
+      <span class="eyebrow">Read before running the scraper against these four sites</span>
+      <h3>None of StepStone, Indeed, jobvector, or LinkedIn offer a compliant search API</h3>
+      <p>Checked all four as of August 2026: Indeed's public Publisher API and XML feed were both retired in 2024 — the only remaining Indeed integrations are enterprise partner programs requiring a sales process. StepStone and jobvector have never published a public search API; their listings are reachable without login, but that doesn't imply a right to automate against them — it just means no CAPTCHA-walled login to defeat. LinkedIn is the clearest documented case: its Terms of Service prohibit scraping regardless of whether the data is public, and LinkedIn won <a href="https://www.fbm.com/publications/what-recent-rulings-in-hiq-v-linkedin-and-other-cases-say-about-the-legality-of-data-scraping/" target="_blank" rel="noopener">hiQ v. LinkedIn</a> on exactly that breach-of-contract ground, and is currently pursuing a similar suit against the scraping service Proxycurl. For an individual, the practical risk on any of the four isn't a lawsuit — it's the site's bot-detection flagging the account and restricting or banning it.</p>
+      <p>Given that, the adapters are ordered by rising risk, not alphabetically:</p>
+      <ul>
+        <li><b>StepStone &amp; jobvector first</b> — no public precedent of enforcement against individual scrapers found, but still ToS-prohibited; keep request volume low and add delays regardless.</li>
+        <li><b>Indeed next</b> — same posture, plus Indeed is known to actively rate-limit and CAPTCHA aggressive traffic.</li>
+        <li><b>LinkedIn last, and lowest-frequency</b> — the one with documented enforcement, so it runs least often and against an account you're comfortable seeing restricted, never the one you apply from.</li>
+        <li><b>Optional low-risk supplement</b> — Adzuna, USAJobs, RemoteOK, and most company career pages (Greenhouse, Lever, Workday) do expose real ToS-compliant APIs; the adapter interface supports adding one alongside the four scrapers if you ever want extra coverage without extra risk.</li>
+      </ul>
+      <p>One EU-specific note: StepStone and jobvector are Germany-based, so GDPR applies. Job listings themselves aren't personal data, but a posting's named recruiter contact (name + direct email) can be — the scraper should keep only what's operationally needed (title, company, location, description, URL) and skip persisting recruiter contact fields.</p>
+      <p>Every adapter now walks the full results listing for a search — <code>scraping/base.py</code>'s <code>paginate_search()</code> requests page 2, 3, ... directly by URL (<code>?page=N</code>, or each site's offset param) instead of reading only the first page, so a single search can trigger several page-loads. That's more requests per search on all four sites, LinkedIn included — factor that into request-volume judgment calls above rather than assuming each search is still a single page fetch. <code>search.max_postings_per_search</code> in <code>config.yaml</code> (default <code>null</code> = no cap) stops a search early once that many postings are collected, trading completeness for fewer requests.</p>
+      <p>LinkedIn's own job-link pattern was also wrong (matching zero real links — its adapter was silently returning ~0 postings every run) and, once fixed, surfaced a shared bug in <code>nearest_card_text()</code>: a non-matching ancestor selector auto-waited Playwright's full 20s default per attempt, which a live run measured as a 9+ minute stall on LinkedIn's DOM specifically. Both fixed and confirmed live — see the README's Compliance note for the measured before/after.</p>
+    </div>
+  </section>
+
+  <section id="stack">
+    <h2>Tech stack</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Layer</th><th>Choice</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Language</td><td><code>Python 3.11+</code></td><td>Best-supported ecosystem for both Playwright and Google API clients</td></tr>
+          <tr><td>LLM</td><td>Ollama, local, output grammar-constrained to a JSON schema (default model <code>qwen2.5:1.5b</code>)</td><td>Schema-guaranteed extraction/matching output with no API key, no cost, and no data leaving the machine; a validate-and-retry loop compensates for a small model's occasional misses</td></tr>
+          <tr><td>Scraping</td><td>Playwright + <code>playwright-stealth</code></td><td>Handles JS-rendered listings; stealth reduces (not eliminates) fingerprint-based blocks</td></tr>
+          <tr><td>Email</td><td>Gmail API via <code>google-api-python-client</code>, OAuth2 desktop flow</td><td>Scoped, revocable access — no raw password/app-password stored</td></tr>
+          <tr><td>State</td><td>SQLite</td><td>Zero-ops, file-based, plenty for single-user dedupe/tracking</td></tr>
+          <tr><td>Validation</td><td>Pydantic</td><td>Same schema for LLM tool calls, storage, and inter-module contracts</td></tr>
+          <tr><td>Scheduling</td><td>APScheduler (in-process) or OS Task Scheduler</td><td>Task Scheduler survives reboots; APScheduler is simpler while iterating</td></tr>
+          <tr><td>OCR (optional)</td><td><code>pytesseract</code> + <code>PyMuPDF</code> + the Tesseract engine binary (<code>winget install UB-Mannheim.TesseractOCR</code>)</td><td>Only needed if diplomas/references arrive as scanned images, not native PDFs — <code>pytesseract</code> is a wrapper, not the OCR engine itself, so the binary is a separate install</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="defaults">
+    <h2>Defaults I've decided, so you don't have to</h2>
+    <p class="section-sub">Every one of these lives in <code>config.yaml</code> and is a one-line change later. Where a decision affects account-ban risk or inbox noise, I optimized for the safer, quieter option rather than the fastest one.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Decision</th><th>Default</th><th>Reasoning</th></tr></thead>
+        <tbody>
+          <tr><td>Scrape cadence</td><td><code>2×/day</code> — 09:00 &amp; 18:00 local</td><td>Matches a human checking job boards morning/evening; a 4-hour poll is easy for bot-detection to fingerprint as automation</td></tr>
+          <tr><td>Match threshold</td><td><code>score ≥ 70/100</code></td><td>High enough to filter noise, low enough not to miss a good-but-imperfect fit; the reasons/missing fields let you eyeball anything near the cutoff</td></tr>
+          <tr><td>Notification batching</td><td>One digest email per run, not per job</td><td>A run with 6 matches becomes 1 email, not 6 — protects the inbox from becoming the thing you have to triage</td></tr>
+          <tr><td>Dedupe key</td><td><code>sha256(company+title+location)</code>, normalized</td><td>Raw URLs break dedup — tracking params and re-listings change the URL without changing the job</td></tr>
+          <tr><td>Source adapters</td><td><code>StepStone</code>, <code>jobvector</code>, <code>Indeed</code>, <code>LinkedIn</code> — run in that order; LinkedIn additionally capped at once per 24h regardless of scheduler frequency</td><td>None of the four expose a public search API in 2026 (Indeed's was retired outright), so all four are scrape adapters; ordered by rising enforcement risk — see compliance note</td></tr>
+          <tr><td>Search preference</td><td>Two target domains, either qualifies: <code>Life Science &amp; Quality Control</code> or <code>Coding &amp; Data Science</code></td><td>Baked into the Matcher's scoring prompt directly — a posting outside both domains scores low regardless of surface keyword overlap</td></tr>
+          <tr><td>Document folder</td><td><code>./data/inbox/</code> — subfolders are cosmetic, everything in the tree gets processed</td><td>One drop point, no upload flow to build for a single-user tool</td></tr>
+          <tr><td>OCR trigger</td><td>Only runs if native text extraction yields &lt; 50 characters</td><td>Most diplomas/CVs are native-text PDFs; OCR is slower and lossier, so it's a fallback, not the default path</td></tr>
+          <tr><td>Email scopes</td><td><code>gmail.readonly</code> + <code>gmail.send</code> only</td><td>Never requests <code>gmail.modify</code>/delete — the agent can read and notify, never alter your mailbox</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="next">
+    <h2>What still has to come from you</h2>
+    <p class="section-sub">The repo is built and tested (25/25 passing) — these two are the only pieces that were never mine to decide.</p>
+    <ol class="steps">
+      <li><span>Documents</span> — drop diplomas, CV, and reference letters into <code>data/inbox/</code> (subfolders <code>cv/</code>, <code>diplomas/</code>, <code>references/</code>, <code>other/</code> exist and are cosmetic — everything in the tree gets processed either way).</li>
+      <li><span>Credentials</span> — none for the LLM (Ollama runs locally, no key); just a Google OAuth client secret saved to <code>data/google_credentials.json</code> for Gmail. The one-time consent-screen click has to be you, by design — that's what makes the access revocable.</li>
+    </ol>
+  </section>
+
+  <footer>
+    Implementation status: built. <code>src/jobhunter/</code> has all seven modules wired end-to-end behind <code>jobhunter check|extract|run|schedule</code> — see <a href="README.md">README.md</a> for setup and <a href="pyproject.toml">pyproject.toml</a> for the dependency list. This doc stays the reference for <em>why</em> each piece works the way it does; when a real decision changes (a default, a source, a scope), it gets updated here too, same as this pass fixed the source-order drift and added the Tesseract binary dependency this table was missing.
+  </footer>
+
+</div>
